@@ -59,15 +59,21 @@ variable        convert equal ${atm2Pa}*${atm2Pa}*${fs2s}*${A2m}*${A2m}*${A2m}
 # setup problem
 #-------------------------------------------------------------------------------
 
-units		lj                                  	# define units
+units		lj                                 	# define units
 dimension	3                               	# dimension : 2d, 3d
 boundary	p p p                               	# specify periodic boundary conditions
 
 
-atom_style	atomic
+atom_style	full #atomic
+bond_style harmonic
+angle_style harmonic
+pair_style hybrid airebo 2.5 1 1 lj/cut/tip4p/long 1 2 1 1 0.1546 12.0
+kspace_style pppm/tip4p 1.0e-4 # TIP4P/2005
+
 neighbor	0.3 bin                             	# specify parameters for neighbor list
                                                     	# rnbr = rcut + 0.3 
 neigh_modify	delay 5
+
 
 
 #-------------------------------------------------------------------------------
@@ -88,7 +94,9 @@ region      bulk        block 1.0 13.0 1.0 13.0 12.0 18.0
 
 
 create_box  2 simbox
-
+#read_data data.lammps
+include PARM.lammps
+molecule h2omol water/water_data_file/TIP4P2005.lammps
 
 #  create atoms for regions "upper_wall" & "lower_wall"
 
@@ -124,8 +132,11 @@ mass            2 1.0
 
 #  create the group "fluid" 
 
-group       fluid subtract all wall wall_space  
-set         group fluid type 2
+#group       fluid subtract all wall wall_space  
+#set         group fluid type 2
+group fluid type 1 2
+
+
 
 
 #  create the group "l_wall_no_space" and "u_wall_no_space"
@@ -140,14 +151,15 @@ group       u_wall_no_space subtract all wall_space lower fluid
 #-------------------------------------------------------------------------------
 
 
-pair_style  lj/cut ${rc}
+#pair_style  lj/cut ${rc}
 
 
-pair_coeff  1 1 50.0 1.0 ${rc}                   	#  ... between atoms of type 1 and 1 
-pair_coeff  2 2 1.0  1.0 ${rc}                  	#  ... between atoms of type 2 and 2 
-pair_coeff  1 2 1.0  1.0 ${rc}                  	#  ... between atoms of type 1 and 2
+#pair_coeff  1 1 50.0 1.0 ${rc}                   	#  ... between atoms of type 1 and 1 
+#pair_coeff  2 2 1.0  1.0 ${rc}                  	#  ... between atoms of type 2 and 2 
+#pair_coeff  1 2 1.0  1.0 ${rc}                  	#  ... between atoms of type 1 and 2
 
-pair_modify shift yes 
+#pair_modify shift yes 
+
 
 
 #-------------------------------------------------------------------------------
@@ -165,9 +177,30 @@ fix         force wall_space setforce 0.0 0.0 0.0
 compute	mobile fluid temp/profile 1 0 0 z 20
 velocity	fluid create $T 482748 temp mobile 
 fix		1 all nve
+
+# initialise velocities, perform nvt on water, and maintain water molecule shape
+#velocity fluid create ${T} ${seed} rot yes dist gaussian
+#compute twat fluid temp
+#compute_modify twat dynamic/dof yes
+#fix mynvt fluid nvt temp ${T} ${T} 0.1
+#fix_modify mynvt temp twat # important for subgroup thermalisation
+#fix myshk fluid shake 1.0e-4 200 0 b 1 a 1 mol h2omol
+#timestep ${dt}
+
 fix		2 fluid temp/rescale 200 $T $T 0.02 1.0
 fix_modify	2 temp mobile
 
+# GCMC procedure
+#compute_modify thermo_temp dynamic/dof yes
+#fix mygcmc fluid gcmc 100 100 0 0 54341 ${T} ${mu} ${disp} &
+# mol h2omol tfac_insert ${tfac} group fluid shake myshk &
+# pressure ${P} region CNT
+
+ # follow the evolution of the number of water molecule during gcmc step
+#variable oxygen atom "type==1"
+#group oxygen dynamic all var oxygen
+#variable nO equal count(oxygen)
+#fix myavt all ave/time 100 1 100 v_nO file numberO.dat
 #-------------------------------------------------------------------------------
 #
 # SIMULATION - 1st run computation
