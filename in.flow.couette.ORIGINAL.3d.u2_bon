@@ -317,7 +317,7 @@ fix	    fsave2 all ave/chunk 1 200 ${NiterB} layer2 vx vy vz v_Temp1 density/mas
 fix	    fsave22 all ave/chunk 1 200 ${NiterB} layer2 vx vy vz temp density/mass &
             norm sample file profile_vel_Temp.all_temp
 
-fix 	    fsave3 fluid ave/chunk 1 200 ${NiterB} layer3 vx vy vz v_Temp1 density/mass &
+fix 	fsave3 fluid ave/chunk 1 200 ${NiterB} layer3 vx vy vz v_Temp1 density/mass &
             norm sample file profile_vel_Temp.fluid
 
 fix	    fsave33 fluid ave/chunk 1 200 ${NiterB} layer3 vx vy vz temp density/mass &
