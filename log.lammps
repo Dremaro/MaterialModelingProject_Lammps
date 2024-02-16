@@ -1,125 +1,314 @@
 LAMMPS (2 Aug 2023)
 OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
   using 1 OpenMP thread(s) per MPI task
-################################################################################
-# 3-d LJ flow simulation
-# Author: D. Chibouti
-################################################################################
-
-
-#-------------------------------------------------------------------------------
-# settings variables
-#-------------------------------------------------------------------------------
-
-variable	x   equal 10
-variable	y   equal 10
-variable	z   equal 1
-variable	dx  equal floor(${x}/9)
-variable	dx  equal floor(10/9)
-variable	dy  equal floor(${y}/9)
-variable	dy  equal floor(10/9)
-variable	dz  equal floor(${z}/9)
-variable	dz  equal floor(1/9)
-
-variable	rho equal 0.6				# fluid density
-variable	RO  equal 0.8	             		# wall density
-variable	T   equal 1.5                       	# temperature
-variable	Ti  equal 8.0                       	# wall temperature  !!!
-variable	V   equal vol                       	# volume
-variable	v0  equal 2.0                      	# velocity
-variable	rc  equal 2.5                       	# cutoff radius for shifted LJ-potential
-
-variable	dt  equal 0.001		      	# timestep delta t (pas de temps)
-variable	p   equal 100                       	# correlation length (step)
-variable	s   equal 5                         	# sample interval  (echantillon)
-variable	d   equal $p*$s                     	# dump interval (timesteps interval)
-variable	d   equal 100*$s                     	
-variable	d   equal 100*5                     	
-
-variable	tprod equal 5000                    	# simulation time for the production run
-variable	Nprod equal floor(${tprod}/${dt})   	# total number of timesteps
-variable	Nprod equal floor(5000/${dt})   	
-variable	Nprod equal floor(5000/0.001)   	
-
-
-#-------------------------------------------------------------------------------
-# settings
-#-------------------------------------------------------------------------------
-
-# options used for fix ave/time; sample the quantities every 10 steps
-
-variable	Niter0  equal 3000
-variable	Niter1  equal 5000
-variable	Niter   equal 10000
-variable	Nsamp   equal 10
-variable	Nrepeat equal floor(${Nprod}/${Nsamp})
-variable	Nrepeat equal floor(5000000/${Nsamp})
-variable	Nrepeat equal floor(5000000/10)
-variable	Nevery  equal ${Nsamp}*${Nrepeat}
-variable	Nevery  equal 10*${Nrepeat}
-variable	Nevery  equal 10*500000
-
-#-------------------------------------------------------------------------------
-# convert from LAMMPS real units to SI
-#-------------------------------------------------------------------------------
-
-variable        kB      equal 1.3806504e-23  		# [J/K] Boltzmann
-variable        atm2Pa  equal 101325.0
-variable        A2m     equal 1.0e-10
-variable        fs2s    equal 1.0e-15
-variable        convert equal ${atm2Pa}*${atm2Pa}*${fs2s}*${A2m}*${A2m}*${A2m}
-variable        convert equal 101325*${atm2Pa}*${fs2s}*${A2m}*${A2m}*${A2m}
-variable        convert equal 101325*101325*${fs2s}*${A2m}*${A2m}*${A2m}
-variable        convert equal 101325*101325*1e-15*${A2m}*${A2m}*${A2m}
-variable        convert equal 101325*101325*1e-15*1e-10*${A2m}*${A2m}
-variable        convert equal 101325*101325*1e-15*1e-10*1e-10*${A2m}
-variable        convert equal 101325*101325*1e-15*1e-10*1e-10*1e-10
-
-#-------------------------------------------------------------------------------
-# setup problem
-#-------------------------------------------------------------------------------
-
-units		lj                                 	# define units
-dimension	3                               	# dimension : 2d, 3d
-boundary	p p p                               	# specify periodic boundary conditions
-
-
-atom_style	full #atomic
+units real
+atom_style full
 bond_style harmonic
 angle_style harmonic
-pair_style hybrid airebo 2.5 1 1 lj/cut/tip4p/long 1 2 1 1 0.1546 12.0
-kspace_style pppm/tip4p 1.0e-4 # TIP4P/2005
+dihedral_style harmonic
+pair_style lj/cut/coul/long 12
+kspace_style pppm 1e-5
+special_bonds lj 0.0 0.0 0.5 coul 0.0 0.0 1.0 angle yes
 
-neighbor	0.3 bin                             	# specify parameters for neighbor list
-                                                    	# rnbr = rcut + 0.3
-neigh_modify	delay 5
-
-
-
-#-------------------------------------------------------------------------------
-#  create geometry : regions, groups ...
-#-------------------------------------------------------------------------------
-
-lattice     fcc ${RO}                              # fcc = face centered cubic (atomic structure)
-lattice     fcc 0.8                              
-Lattice spacing in x,y,z = 1.7099759 1.7099759 1.7099759
-                                                   # density : {RO} for solid
-#*******************************************************************************
-#  define regions
-#*******************************************************************************
-region      simbox      block 0.0 15.0 0.0 15.0 0.0 30.0
-region      upper_wall  block 0.0 14.5 0.0 14.5 20.0 25.0
-region      lower_wall  block 0.0 14.5 0.0 14.5 5.0 10.0
-region      upper_space block 0.0 14.5 0.0 14.5 25.0 30.0
-region      lower_space block 0.0 14.5 0.0 14.5 0.0 5.0
-region      bulk        block 1.0 13.0 1.0 13.0 12.0 18.0
-
-
-create_box  2 simbox
-Created orthogonal box = (0 0 0) to (25.649639 25.649639 51.299278)
+region box block -15 15 -15 15 -15 15
+create_box 9 box bond/types 6 angle/types 15 dihedral/types 3 extra/bond/per/atom 2 extra/angle/per/atom 1 extra/special/per/atom 2
+Created orthogonal box = (-15 -15 -15) to (15 15 15)
   1 by 1 by 1 MPI processor grid
-#read_data data.lammps
-include PARM.lammps
-1 bond types
-ERROR: Unknown command: 1 bond types (src/input.cpp:303)
-Last command: 1 bond types
+
+include PARM_1.lammps
+# LAMMPS input script by Simon Gravelle
+# This input is part of a tutorial from https://lammpstutorials.github.io
+# Last tested using the 2Aug2023 stable LAMMPS version
+# This file was released under the GNU general public license v3.0
+
+# ⣿⣿⡆⠀⠀⠀⠀⠀⠀⣾⣿⣿⣆⠀⠀⠀⣿⣿⣿⣆⠀⠀⣰⣿⣿⣷⠀⢸⣿⣿⣷⡀⠀⢀⣾⣿⣿⠀⠀⣿⣿⣿⣿⣿⣷⣆⠀⢀⣶⣿⠿⠿⣿⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣠⣤⣶⣿⣿⣿⣦⡄⠀⠀⠀⠀⠀⠀⠀
+# ⣿⣿⡇⠀⠀⠀⠀⠀⣼⣿⡏⣿⣿⡄⠀⠀⣿⣿⡿⣿⡆⢰⣿⢿⣿⣿⠀⢸⣿⣿⢿⣧⠀⣾⡿⣿⣿⠀⠀⣿⣿⡇⠀⢈⣿⣿⠀⢸⣿⣧⣄⣀⡀⠀⠀⠀⠀⠀⠀⠀⢀⣤⣾⣿⣿⠏⣿⣿⣿⣿⣿⣿⣿⡄⠀⠀⠀⠀⠀⠀
+# ⣿⣿⡇⠀⠀⠀⠀⢰⣿⣿⣀⣸⣿⣷⡀⠀⣿⣿⡇⢻⣿⣿⡏⢸⣿⣿⠀⢸⣿⣿⠘⣿⣿⡿⠁⣿⣿⠀⠀⣿⣿⡿⠿⠿⠿⠋⠀⠀⠉⠛⠻⠿⣿⣷⠀⠀⠀⠀⠀⢠⣿⣿⣿⣿⣿⡄⠻⣿⣿⣿⣿⡿⠟⣃⠀⠀⠀⠀⠀⠀
+# ⣿⣿⣧⣤⣤⣤⢠⣿⣿⠛⠛⠛⢻⣿⣧⠀⣿⣿⡇⠀⠛⠛⠀⢸⣿⣿⠀⢸⣿⣿⠀⠘⠛⠃⠀⣿⣿⠀⠀⣿⣿⡇⠀⠀⠀⠀⠀⢰⣶⣤⣤⣤⣿⡿⠀⠀⠀⠀⠀⣻⣿⣿⣿⣿⣿⣿⣄⡀⠉⠉⠁⠀⢠⣿⡄⠀⠀⠀⠀⠀
+# ⠉⠉⠉⠉⠉⠉⠈⠉⠁⠀⠀⠀⠀⠉⠉⠀⠉⠉⠁⠀⠀⠀⠀⠈⠉⠉⠀⠈⠉⠉⠀⠀⠀⠀⠀⠉⠉⠀⠀⠉⠉⠁⠀⠀⠀⠀⠀⠀⠉⠉⠉⠉⠉⠀⠀⠀⠀⠀⠀⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣶⣶⣾⣿⣿⡇⠀⠀⠀⠀⠀
+# ⢀⣤⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣤⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⣶⠀⠀⠀⠀⠀⠀⠀⠀⢰⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡃⠀⠀⠀⠀⠀
+# ⣼⣿⣴⡦⠀⣴⠀⠀⠀⣴⡄⢤⣿⣧⣶⠄⢀⣤⡶⣶⣄⠀⠀⣴⣤⣴⣦⢠⣦⠀⠀⣤⠶⢶⣤⡀⠀⢸⡇⠀⢠⣴⠶⢦⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣼⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣶⣄⠀⠀⠀
+# ⢸⣿⠀⠀⠀⣿⠀⠀⠀⣿⡇⠀⣿⡆⠀⠀⣿⠇⠀⠀⢻⡇⠀⣿⡇⠀⠀⢸⣿⠀⠀⣠⣤⣤⣽⡇⠀⢸⡇⠀⢻⣧⣄⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣀⣀⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣧⡀⠀
+# ⠸⣿⠀⠀⠀⣿⡄⠀⢀⣿⡇⠀⣿⡇⠀⠀⢿⣇⠀⢀⣼⡇⠀⣿⡇⠀⠀⢸⣿⠀⢸⣏⠀⠀⣼⡇⠀⢸⡇⠀⡀⠀⠉⢹⣷⠀⠀⠀⠀⠀⠀⠀⣀⣴⣾⣿⣿⡟⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⠀
+# ⠀⠙⠛⠛⠀⠈⠛⠛⠋⠛⠁⠀⠈⠛⠛⠃⠈⠛⠛⠛⠋⠀⠀⠛⠃⠀⠀⠘⠛⠀⠈⠛⠛⠛⠙⠃⠀⠘⠃⠀⠙⠛⠛⠛⠁⠀⠀⠀⠀⠀⢠⣾⣿⣿⣿⣿⣿⠀⣼⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇
+# ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣴⣿⣿⣿⣿⣿⣿⣿⡀⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
+#⠀ ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇⢻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡏
+# ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡘⣿⣿⣿⣿⣿⡏⣼⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠁
+# ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠨⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⡈⠻⣿⣿⣿⣇⠸⣿⣿⣿⣿⣿⣿⡿⢻⣿⣿⠿⠋⠁⠀
+# ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⡀⠈⠻⢿⣿⣦⣈⠙⠛⠛⠛⣁⣴⡿⠛⠁⠀⠀⠀⠀
+# ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣦⡀⠀⠈⠉⠛⠛⠓⠚⠋⠉⠁⠀⠀⠀⠀⠀⠀⠀
+# ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⠻⠿⣿⣿⣿⣿⡿⠟⠋⠀
+
+mass 1 15.9994 # PEG O
+mass 2 12.011 # PEG C
+mass 3 1.008 # PEG H
+mass 4 1.008 # PEG H
+mass 5 12.011 # PEG C
+mass 6 15.9994 # PEG O
+mass 7 15.9994 # PEG O
+mass 8 15.9994 # H2O O
+mass 9 1.008 # H2O H
+
+pair_coeff 1 1 0.25265643 2.8491607
+pair_coeff 2 2 0.06630155 3.5811794
+pair_coeff 3 3 0.028293679 2.373408
+pair_coeff 4 4 0.0 0.0
+pair_coeff 5 5 0.24501823 2.8114421
+pair_coeff 6 6 0.11949714 3.1000042
+pair_coeff 7 7 0.11949714 3.1000042
+pair_coeff 8 8 0.119431704 3.400251
+pair_coeff 9 9 0.0 0.0
+
+bond_coeff 1 400.05737 1.4
+bond_coeff 2 400.0343 1.53
+bond_coeff 3 155.35373 1.42
+bond_coeff 4 143.40344 1.11
+bond_coeff 5 621.4149 0.938
+bond_coeff 6 442.1606 0.972
+
+angle_coeff 1 47.555878 103.0
+angle_coeff 2 50.17089 108.0
+angle_coeff 3 30.173132 109.5
+angle_coeff 4 47.69405 109.5
+angle_coeff 5 55.12715 109.5
+angle_coeff 6 47.634956 109.6
+angle_coeff 7 55.113907 111.0
+angle_coeff 8 59.79372 115.0
+angle_coeff 9 52.476738 107.57
+angle_coeff 10 54.956596 107.6
+angle_coeff 11 54.993103 110.3
+angle_coeff 12 55.0234 111.4
+angle_coeff 13 30.173132 110.0
+angle_coeff 14 509.99622 112.0
+angle_coeff 15 47.555878 103.0
+
+dihedral_coeff 1 0.30114722 1 3
+dihedral_coeff 2 1.414914 1 3
+dihedral_coeff 3 0.0 1 1
+
+
+
+
+molecule h2omol water/water_data_file/FlexibleH2O.txt
+Read molecule template h2omol:
+  1 molecules
+  0 fragments
+  3 atoms with max type 9
+  2 bonds with max type 6
+  1 angles with max type 15
+  0 dihedrals with max type 0
+  0 impropers with max type 0
+create_atoms 0 random 350 45615 NULL mol     h2omol 14756 overlap 1 maxtry 50
+Created 1050 atoms
+  using lattice units in orthogonal box = (-15 -15 -15) to (15 15 15)
+  create_atoms CPU = 0.009 seconds
+
+group H2O type 8 9
+1050 atoms in group H2O
+minimize 1.0e-4 1.0e-6 100 1000
+PPPM initialization ...
+  using 12-bit tables for long-range coulomb (src/kspace.cpp:342)
+  G vector (1/distance) = 0.24900018
+  grid = 20 20 20
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.0024186408
+  estimated relative force accuracy = 7.2836648e-06
+  using double precision FFTW3
+  3d grid and FFT values/proc = 19683 8000
+Generated 36 of 36 mixed pair_coeff terms from geometric mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 14
+  ghost atom cutoff = 14
+  binsize = 7, bins = 5 5 5
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair lj/cut/coul/long, perpetual
+      attributes: half, newton on
+      pair build: half/bin/newton
+      stencil: half/bin/3d
+      bin: standard
+Per MPI rank memory allocation (min/avg/max) = 10.81 | 10.81 | 10.81 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0              15856.787      79.633604      15936.421      175169.47    
+       100   0             -2624.3748      130.99761     -2493.3772     -1928.9472    
+Loop time of 1.38663 on 1 procs for 100 steps with 1050 atoms
+
+99.0% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = max iterations
+  Energy initial, next-to-last, final = 
+      15936.4209652149  -2490.84454576324  -2493.37720050822
+  Force two-norm initial, final = 37387.899 51.162267
+  Force max component initial, final = 15460.736 11.160509
+  Final line search alpha, max atom move = 0.0053957465 0.060219275
+  Iterations, force evaluations = 100 165
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 1.1649     | 1.1649     | 1.1649     |   0.0 | 84.01
+Bond    | 0.00669    | 0.00669    | 0.00669    |   0.0 |  0.48
+Kspace  | 0.16976    | 0.16976    | 0.16976    |   0.0 | 12.24
+Neigh   | 0.031549   | 0.031549   | 0.031549   |   0.0 |  2.28
+Comm    | 0.0074555  | 0.0074555  | 0.0074555  |   0.0 |  0.54
+Output  | 5.051e-05  | 5.051e-05  | 5.051e-05  |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.00624    |            |       |  0.45
+
+Nlocal:           1050 ave        1050 max        1050 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:           6622 ave        6622 max        6622 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:         233387 ave      233387 max      233387 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 233387
+Ave neighs/atom = 222.27333
+Ave special neighs/atom = 2
+Neighbor list builds = 4
+Dangerous builds = 0
+reset_timestep 0
+
+fix mynpt all npt temp 300 300 100 iso 1 1 1000
+
+dump mydmp all atom 1000 dump.lammpstrj
+variable mytemp equal temp
+variable myvol equal vol
+fix myat1 all ave/time 10 10 100 v_mytemp file temperature.dat
+fix myat2 all ave/time 10 10 100 v_myvol file volume.dat
+variable myoxy equal count(H2O)/3
+variable mydensity equal ${myoxy}/v_myvol
+variable mydensity equal 350/v_myvol
+fix myat3 all ave/time 10 10 100 v_mydensity file density.dat
+thermo 1000
+
+
+timestep 1.0
+run 50000
+PPPM initialization ...
+  using 12-bit tables for long-range coulomb (src/kspace.cpp:342)
+  G vector (1/distance) = 0.24900018
+  grid = 20 20 20
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.0024186408
+  estimated relative force accuracy = 7.2836648e-06
+  using double precision FFTW3
+  3d grid and FFT values/proc = 19683 8000
+Generated 36 of 36 mixed pair_coeff terms from geometric mixing rule
+Per MPI rank memory allocation (min/avg/max) = 9.684 | 9.684 | 9.684 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press          Volume    
+         0   0             -2624.3748      130.99761     -2493.3772     -1928.9472      27000        
+      1000   314.37138     -2066.8959      115.86567     -968.03187      881.94015      23119.256    
+      2000   318.6488      -1870.8641      124.18876     -750.30205     -73.985457      24848.296    
+      3000   288.28666     -1873.4426      131.68547     -840.32231     -207.74778      24927.216    
+      4000   306.47867     -1943.6414      163.74819     -821.57434     -124.71772      24084.305    
+      5000   290.5366      -1972.5964      197.82494     -866.30133     -317.12904      22794.34     
+      6000   303.86136     -2051.3668      190.92612     -910.30575      39.154845      20818.874    
+      7000   303.29873     -2046.7752      180.95794     -917.4416      -192.75049      20636.935    
+      8000   286.94539     -2108.2737      213.30156     -997.73128     -987.27378      19684.876    
+      9000   291.28943     -2141.6498      221.3457      -1009.48       -182.8889       18543.198    
+     10000   295.20065     -2224.7252      256.4883      -1045.183      -1127.2612      17566.456    
+     11000   316.1062      -2259.7692      289.83031     -981.51597     -66.962084      17621.558    
+     12000   315.81421     -2285.8839      274.87559     -1023.4985      258.49564      17227.912    
+     13000   305.70777     -2260.4325      284.81201     -1019.7121      1530.2888      16724.968    
+     14000   307.67264     -2349.8262      309.35372     -1078.4202     -2021.1426      16816.739    
+     15000   291.96592     -2362.1686      300.61988     -1148.6093     -246.52417      15765.519    
+     16000   320.65762     -2352.2158      323.33005     -1026.2312      49.689753      16070.936    
+     17000   293.61805     -2399.2883      356.15375     -1125.0291     -774.20049      16572.831    
+     18000   313.38726     -2401.214       348.85828     -1072.4346     -20.640073      16665.263    
+     19000   288.93518     -2425.6192      341.87794     -1180.2786      6.1691179      15590.4      
+     20000   304.89409     -2432.8892      334.91594     -1144.6091     -213.29961      15229.535    
+     21000   293.84678     -2450.9211      358.80796     -1173.2925      435.01056      15570.753    
+     22000   286.92573     -2424.9611      360.41435     -1167.3674      73.382774      15838.213    
+     23000   305.59721     -2438.8541      367.04673     -1116.2447      1444.7872      16062.685    
+     24000   293.93463     -2509.8045      364.7259      -1225.9833     -1250.5365      15754.271    
+     25000   292.02486     -2518.2784      395.89954     -1209.2552      320.49249      14654.095    
+     26000   305.61579     -2524.4865      433.42213     -1135.4436     -1334.7958      14987.499    
+     27000   287.66335     -2557.5343      409.75061     -1248.2978     -493.64184      14432.461    
+     28000   305.90614     -2532.4162      404.10389     -1171.7837     -323.93317      15147.163    
+     29000   291.51087     -2574.7997      412.3635      -1250.9197      276.40681      14711.089    
+     30000   306.42296     -2574.0015      406.86998     -1208.9868      1267.4275      14810.857    
+     31000   298.51094     -2549.7002      382.68081     -1233.6145      2213.8404      14354.933    
+     32000   279.55563     -2643.0895      457.63997     -1311.3155     -2182.5813      14457.007    
+     33000   298.51449     -2584.4439      409.53224     -1241.4958     -645.50502      14900.564    
+     34000   307.05234     -2625.3612      431.24206     -1234.0065     -1301.7769      14204.503    
+     35000   300.44634     -2627.0866      450.03909     -1237.5909     -985.31803      14556.588    
+     36000   296.51747     -2611.1861      467.62973     -1216.3848     -2175.3056      14757.973    
+     37000   303.54578     -2651.2606      420.4297      -1281.6828      167.09373      14274.694    
+     38000   299.15797     -2571.615       420.92912     -1215.2579      642.91924      14093.399    
+     39000   298.29177     -2629.5841      443.9286      -1252.936       176.54977      14193.581    
+     40000   294.04696     -2670.653       450.62605     -1300.5804      1475.6816      13815.218    
+     41000   293.86616     -2659.7511      449.4692      -1291.4007     -795.91745      14792.612    
+     42000   295.30288     -2643.7358      448.48577     -1271.8764     -195.32959      14387.613    
+     43000   312.63337     -2658.9918      487.85128     -1193.5767     -605.90813      14374.153    
+     44000   307.98005     -2694.3774      494.25439     -1237.1095     -2006.8721      14483.521    
+     45000   301.95268     -2680.7389      426.72009     -1309.8521      303.76531      14193.58     
+     46000   300.69262     -2644.5875      472.16739     -1232.1935     -702.48063      14720.429    
+     47000   303.12296     -2649.8414      452.86147     -1249.1539      667.91018      14089.558    
+     48000   292.17706     -2646.6027      456.87614     -1276.127       544.49454      14539.218    
+     49000   293.49975     -2645.9273      458.71611     -1269.4757     -1443.8782      14397.01     
+     50000   305.25015     -2673.7389      475.21598     -1244.0454     -330.91513      14109.25     
+Loop time of 540.255 on 1 procs for 50000 steps with 1050 atoms
+
+Performance: 7.996 ns/day, 3.001 hours/ns, 92.549 timesteps/s, 97.176 katom-step/s
+98.5% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 380.54     | 380.54     | 380.54     |   0.0 | 70.44
+Bond    | 2.0663     | 2.0663     | 2.0663     |   0.0 |  0.38
+Kspace  | 55.093     | 55.093     | 55.093     |   0.0 | 10.20
+Neigh   | 39.568     | 39.568     | 39.568     |   0.0 |  7.32
+Comm    | 3.2014     | 3.2014     | 3.2014     |   0.0 |  0.59
+Output  | 0.062406   | 0.062406   | 0.062406   |   0.0 |  0.01
+Modify  | 58.848     | 58.848     | 58.848     |   0.0 | 10.89
+Other   |            | 0.8786     |            |       |  0.16
+
+Nlocal:           1050 ave        1050 max        1050 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:           9532 ave        9532 max        9532 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:         448305 ave      448305 max      448305 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 448305
+Ave neighs/atom = 426.95714
+Ave special neighs/atom = 2
+Neighbor list builds = 2508
+Dangerous builds = 0
+
+replicate 3 1 1
+Replication is creating a 3x1x1 = 3 times larger system...
+  orthogonal box = (-12.081976 -12.081976 -12.081976) to (60.409881 12.081976 12.081976)
+  1 by 1 by 1 MPI processor grid
+  3150 atoms
+  2100 bonds
+  1050 angles
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        0        0.5     
+  special bond factors coul:  0        0        1       
+     2 = max # of 1-2 neighbors
+     1 = max # of 1-3 neighbors
+     1 = max # of 1-4 neighbors
+  2100 = # of 1-3 neighbors before angle trim
+  2100 = # of 1-3 neighbors after angle trim
+     5 = max # of special neighbors
+  special bonds CPU = 0.003 seconds
+  replicate CPU = 0.010 seconds
+
+write_data H2O.data
+System init for write_data ...
+PPPM initialization ...
+  using 12-bit tables for long-range coulomb (src/kspace.cpp:342)
+  G vector (1/distance) = 0.24936002
+  grid = 40 18 18
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.0032594058
+  estimated relative force accuracy = 9.8156039e-06
+  using double precision FFTW3
+  3d grid and FFT values/proc = 29375 12960
+Generated 36 of 36 mixed pair_coeff terms from geometric mixing rule
+Total wall time: 0:09:01
