@@ -98,13 +98,24 @@ Lattice spacing in x,y,z = 1.7099759 1.7099759 1.7099759
 #*******************************************************************************
 #  define regions
 #*******************************************************************************
+variable xl equal 14.5
+variable yw equal 14.5
+variable zh equal 20.0
+
 region      simbox      block 0.0 15.0 0.0 15.0 0.0 30.0
+region      upper_wall  block 0.0 ${xl} 0.0 ${yw} 20.0 25.0
+region      upper_wall  block 0.0 14.5 0.0 ${yw} 20.0 25.0
 region      upper_wall  block 0.0 14.5 0.0 14.5 20.0 25.0
+region      lower_wall  block 0.0 ${xl} 0.0 ${yw} 5.0 10.0
+region      lower_wall  block 0.0 14.5 0.0 ${yw} 5.0 10.0
 region      lower_wall  block 0.0 14.5 0.0 14.5 5.0 10.0
+region      upper_space block 0.0 ${xl} 0.0 ${yw} 25.0 30.0
+region      upper_space block 0.0 14.5 0.0 ${yw} 25.0 30.0
 region      upper_space block 0.0 14.5 0.0 14.5 25.0 30.0
+region      lower_space block 0.0 ${xl} 0.0 ${yw} 0.0 5.0
+region      lower_space block 0.0 14.5 0.0 ${yw} 0.0 5.0
 region      lower_space block 0.0 14.5 0.0 14.5 0.0 5.0
 region      bulk        block 1.0 13.0 1.0 13.0 12.0 18.0
-
 
 create_box  2 simbox
 Created orthogonal box = (0 0 0) to (25.649639 25.649639 51.299278)
@@ -115,17 +126,20 @@ Created orthogonal box = (0 0 0) to (25.649639 25.649639 51.299278)
 create_atoms    1 region upper_wall
 Created 4950 atoms
   using lattice units in orthogonal box = (0 0 0) to (25.649639 25.649639 51.299278)
-  create_atoms CPU = 0.001 seconds
+  create_atoms CPU = 0.002 seconds
 create_atoms    1 region lower_wall
 Created 4950 atoms
   using lattice units in orthogonal box = (0 0 0) to (25.649639 25.649639 51.299278)
-  create_atoms CPU = 0.001 seconds
+  create_atoms CPU = 0.002 seconds
 mass            1 1.0
 
 
 #-------------------------------------------------------------------------------
 # define groups
 #-------------------------------------------------------------------------------
+group       total region simbox
+9900 atoms in group total
+
 #  create the group "wall"
 group       upper region upper_wall
 4950 atoms in group upper
@@ -145,6 +159,8 @@ group       lower_space region lower_space
 450 atoms in group lower_space
 group       wall_space union upper_space lower_space
 900 atoms in group wall_space
+group       flow subtract total wall_space
+9000 atoms in group flow
 set         group wall_space type 1
 Setting atom values ...
   900 settings made for type
@@ -157,7 +173,7 @@ Lattice spacing in x,y,z = 1.8820721 1.8820721 1.8820721
 create_atoms    2 region bulk
 Created 2662 atoms
   using lattice units in orthogonal box = (0 0 0) to (25.649639 25.649639 51.299278)
-  create_atoms CPU = 0.001 seconds
+  create_atoms CPU = 0.002 seconds
 mass            2 1.0
 
 
@@ -255,9 +271,15 @@ variable    T_fluid equal c_temp_fluid
 variable    T_lower equal c_temp_lower
 variable    T_upper equal c_temp_upper
 variable    Fx      equal fcm(flow,x)
+variable    S       equal ${xl}*${yw}
+variable    S       equal 14.5*${yw}
+variable    S       equal 14.5*14.5
 
+variable    ShearStress equal v_Fx/$S
+variable    ShearStress equal v_Fx/210.25
+variable    ShearRate   equal v_v0/v_zh
 
-
+variable    viscosity   equal v_ShearStress/(v_ShearRate+1.0e-10)
 
 
 
@@ -269,7 +291,7 @@ timestep    ${dt}
 timestep    0.004
 
 #thermo_style custom step temp c_temp_fluid c_temp_lower c_temp_upper pe ke etotal
-thermo_style custom step temp time
+thermo_style custom step temp time v_viscosity
 
 thermo      ${d}
 thermo      500
@@ -290,6 +312,8 @@ Neighbor list info ...
       stencil: half/bin/3d
       bin: standard
 Per MPI rank memory allocation (min/avg/max) = 7.337 | 7.337 | 7.337 Mbytes
-   Step          Temp           Time     
-         0   0.31704171     0            
-       500   1.6782897      2            
+   Step          Temp           Time       v_viscosity  
+         0   0.31704171     0             -123.12076    
+       500   1.6782897      2              161.58554    
+      1000   1.4059266      4             -232.98774    
+      1500   1.3786104      6              86.169603    
